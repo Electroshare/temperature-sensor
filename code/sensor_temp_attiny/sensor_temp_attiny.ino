@@ -6,8 +6,8 @@
  * Louis Barbier
  */
 /*
-TRAME : [PARITE | ID_SONDE | DECIMALE_TEMP | SIGNE | ENTIER_TEMP]
-        16      15         12              8       7            0
+TRAME : [PARITY | ID_SENSOR | DECIMAL_TEMP | SIGN | INTEGER_TEMP]
+        16      15         12              8      7             0
 */
 #include <Manchester.h>
 #include "OneWire.h"
