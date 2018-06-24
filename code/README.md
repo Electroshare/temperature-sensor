@@ -2,7 +2,7 @@
 
 ## sensor_temp_attiny
 
-First version with parity generator and 8 sensor support
+First version with parity generator and 8 sensors support
 
 * 433MHz module
 * ATtiny 85 
