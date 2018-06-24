@@ -2,7 +2,8 @@
 
 ## sensor_temp_attiny
 
-First version with 
+First version with parity generator and 8 sensor support
+
 * 433MHz module
 * ATtiny 85 
 * DS18B20 temperature sensor
