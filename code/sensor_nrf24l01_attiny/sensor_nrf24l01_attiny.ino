@@ -50,7 +50,7 @@
 #define RF_CHANNEL 96
 #define CE_PIN 3
 #define CSN_PIN 3
-uint8_t addresses[][6] = {"00001","main"};
+uint8_t addresses[][6] = {"sense","main"};
 
 // DS18B20 
 #define SENSE_TEMP 4

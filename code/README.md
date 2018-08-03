@@ -14,8 +14,15 @@ First version with parity generator and 8 sensors support
 
 ## sensor_nrf24l01_attiny
 
-Code for sensors. Up to 6 sensors with 1 main station. Low power consumption. Need to be tested !
+Code for sensors. Up to 8 sensors with 1 main station for the moment. Low power consumption. **Need to be tested !**
 
 * nRF24L01 module
 * ATtiny85
 * DS18B20 temperature sensor
+
+## main_station_nrf24l01_nano
+
+Code for the main station. Up to 8 sensors with 1 main station for the moment. **Need to be tested !**
+
+* nRF24L01 module
+* Arduino Nano
