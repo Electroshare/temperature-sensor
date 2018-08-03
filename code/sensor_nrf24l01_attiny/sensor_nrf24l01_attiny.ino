@@ -1,8 +1,8 @@
 /*
  * Temperature sensor
- * CREATION : 30-12-2017
- * UPDATE : 01-01-2018
- * rev : 1.2
+ * CREATION : 03-08-2018
+ * UPDATE : 03-08-2018
+ * rev : 1.0
  * Louis Barbier
  *
  * This file is part of Temperature-sensor.
@@ -22,25 +22,39 @@
  *
  */
 
+
 /*
-TRAME : [PARITY | ID_SENSOR | DECIMAL_TEMP | SIGN | INTEGER_TEMP]
-        16      15         12              8      7             0
+                                                                                            ^^
+                                 +-\/-+           nRF24L01   CE, pin3 ------|              //
+                           PB5  1|o   |8  Vcc --- nRF24L01  VCC, pin2 ------x----------x--|<|-- 5V
+                   NC      PB3  2|    |7  PB2 --- nRF24L01  SCK, pin5 --|<|---x-[22k]--|  LED
+               DS18B20 --- PB4  3|    |6  PB1 --- nRF24L01 MOSI, pin6  1n4148 |
+    nRF24L01 GND, pin1 -x- GND  4|    |5  PB0 --- nRF24L01 MISO, pin7         |
+                        |        +----+                                       |
+                        |-----------------------------------------------||----x-- nRF24L01 CSN, pin4 
+                                                                       10nF
 */
-#include <Manchester.h>
+
+#include "RF24.h"
 #include "OneWire.h"
 #include <avr/sleep.h>
 #include <avr/wdt.h>
 #include <util/delay.h>
 
-#define RF_DATA 1
-#define RF_ALIM 0
+// General
 #define SENSE_ALIM 2
-#define SENSE_TEMP 4
-#define LED_PIN 3
 #define SENSOR_NUM 0b001 // 8 sensors maximum
-#define RESOLUTION_TEMP 12
+
+// nRF24L01
+#define RF_ALIM 3
+#define RF_CHANNEL 96
+#define CE_PIN 3
+#define CSN_PIN 3
+uint8_t addresses[][6] = {"00001","main"};
 
 // DS18B20 
+#define SENSE_TEMP 4
+#define RESOLUTION_TEMP 12
 const int ReadROM = 0x33;
 const int MatchROM = 0x55;
 const int SkipROM = 0xCC;
@@ -48,6 +62,7 @@ const int ConvertT = 0x44;
 const int ReadScratchpad = 0xBE;
 
 OneWire ow = OneWire(SENSE_TEMP);
+RF24 radio(CE_PIN, CSN_PIN);
 
 float temp = 0.0;
 uint8_t tInt = 0;
@@ -62,10 +77,19 @@ void start() {
   // Configure attiny85 sleep mode
   set_sleep_mode(SLEEP_MODE_PWR_DOWN);
 
-  DDRB = (1 << RF_ALIM) | (0 << RF_DATA) | (0 << SENSE_ALIM); //| (1 << LED_PIN);
-  //PORTB &= ~(1 << RF_ALIM);
-  man.setupTransmit(RF_DATA, MAN_300); // Rx pin, speed
-  PORTB = 0;//PORTB = (1 << RF_DATA);
+  //DDRB = (1 << RF_ALIM) | (0 << SENSE_ALIM);
+  //PORTB = 1 << RF_ALIM;
+
+  radio.begin();
+  radio.setChannel(RF_CHANNEL);
+  radio.setAutoAck(1);
+  radio.setRetries(15,5); // 5 retries, (15+1)*250us=4000us between each retry
+  radio.openWritingPipe(addresses[1]);
+  radio.openReadingPipe(1,addresses[0]);
+  radio.setPayloadSize(5); // 5 bytes payload
+  radio.setPALevel(RF24_PA_MAX);
+  if(!radio.setDataRate(RF24_250KBPS))
+  	radio.setDataRate(RF24_1MBPS);
 }
 
 bool readTemperature () {
@@ -134,25 +158,20 @@ int main()
   start();
   
   while(1) {
-    PORTB |= 1 << RF_ALIM;
-    //PORTB |= 1 << LED_PIN;
+    //PORTB |= 1 << RF_ALIM;
+    radio.powerUp();
     readTemperature();
     processTemp();
 
     uint16_t data = (SENSOR_NUM << 4) | tDec;
     data = (data << 8) | tInt;
     data = generateParity(data);
+	
+	radio.stopListening();
+    radio.write(&data, sizeof(uint16_t));
 
-    _delay_ms(5);
-
-    man.transmit(data);
-    
-    _delay_ms(125);
-
-    man.transmit(data);
-
-    PORTB &= ~(1 << RF_ALIM);
-    //PORTB &= ~(1 << LED_PIN);
+    radio.powerDown();
+    //PORTB &= ~(1 << RF_ALIM);
     system_sleep(10);
   } 
 }
