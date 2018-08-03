@@ -26,3 +26,4 @@ Code for the main station. Up to 8 sensors with 1 main station for the moment. *
 
 * nRF24L01 module
 * Arduino Nano
+* I2C and Serial communication

@@ -2,12 +2,13 @@
  * Microcontroleur de liaison entre les capteurs de températures (433MHz) et le rasberry pi (I2C)
  * CREATION : 03-08-2018
  * MAJ : 03-08-2018
- * rev : 1.0
+ * rev : 1.1
  */
 /*
 Each data sensor is coded on 2 bytes. 
 I2C implemented
-Serial not implemented yet
+Serial implemented
+Watchdog not implemented yet
 
 TRAME : [PARITÉ | ID_SONDE | DECIMALE_TEMP | SIGNE | ENTIER_TEMP]
         16      15         12              8       7            0
@@ -45,39 +46,21 @@ byte length = 0;
 uint8_t tempTab[NB_TAB+1] = {0};
 unsigned long time_actual = 0, time_prev = 0, time_sensor[NB_SENSOR] = {0};
 
-//enable the wdt for 8sec reset
 /*void wdtEnable(void)
 {
-    wdt_reset();
-    cli();
-    MCUSR = 0x00;
-    WDTCR |= _BV(WDCE) | _BV(WDE);
-    WDTCR = _BV(WDE) | _BV(WDP3) | _BV(WDP0); //8192ms
-    sei();
+    
 }*/
 
 RF24 radio(CE_PIN, CSN_PIN);
 
 void setup() 
-{
-/*  ADMUX =   (0 << ADLAR) |     //do not left shift result (for 10-bit values)
-            (0 << REFS2) |     // Sets ref. voltage to Vcc, bit 2
-            (0 << REFS1) |     // Sets ref. voltage to Vcc, bit 1   
-            (0 << REFS0) |     // Sets ref. voltage to Vcc, bit 0
-            (0 << MUX3)  |     // use ADC3 for input (PB3), MUX bit 3
-            (0 << MUX2)  |     // use ADC3 for input (PB3), MUX bit 2
-            (1 << MUX1)  |     // use ADC3 for input (PB3), MUX bit 1
-            (1 << MUX0);       // use ADC3 for input (PB3), MUX bit 0
-
-   ADCSRA = (1 << ADEN)  |     // Enable ADC 
-            (1 << ADPS2) |     // set prescaler to 128, bit 2 
-            (0 << ADPS1) |     // set prescaler to 128, bit 1 
-            (1 << ADPS0);      // set prescaler to 128, bit 0 */
-            
+{            
   Wire.begin(SL_ADR_I2C);
 
   Wire.onReceive(receiveData);
   Wire.onRequest(sendData);
+
+  Serial.begin(9600);
 
   // nRF24L01
   radio.begin();
@@ -126,10 +109,17 @@ void loop()
       }
     }
   }
+
+  if(Serial.available() > 0) {
+    uint8_t idSensorToSend = Serial.read();
+    Serial.write(tempTab[idSensorToSend]);
+    while(Serial.available() > 0)
+      Serial.read();
+  }
   
   if (time_actual - time_prev > TIME_POOL_VALIDITY)
   {
-    for (int i = 1; i < NB_SENSOR; i++)
+    for (int i = 0; i < NB_SENSOR; i++)
     {
       if(time_actual - time_sensor[i] > TIME_VALIDITY)
         tempTab[NB_TAB] &= ~(1 << i);
@@ -169,20 +159,6 @@ void sendData()
     Wire.write(tempTab[registre+i]);
   }
 }
-
-/*void recupTempInt()
-{
-  ADCSRA |= (1 << ADSC);
-  while (ADCSRA & (1 << ADSC))
-    ;
-
-  ADCSRA |= (1 << ADSC);
-  while (ADCSRA & (1 << ADSC))
-    ;
-    
-  data[2] = ADCL; // bits de poids faible
-  data[3] = ADCH; // bits de poids fort
-}*/
 
 float processTemp(uint16_t buf) {
   int8_t tInt = buf & 0x00FF;
