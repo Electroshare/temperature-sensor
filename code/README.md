@@ -27,3 +27,13 @@ Code for the main station. Up to 8 sensors with 1 main station for the moment. *
 * nRF24L01 module
 * Arduino Nano
 * I2C and Serial communication
+
+## sensor_nrf24l01_attiny
+
+Code for sensors, but smaller to fit inside an attiny13a.
+Doesn't use the arduino IDE, but a makefile with avrdude.
+**Still under developpment !**
+
+* nRF24L01 module
+* ATtiny13a
+* DS18B20 temperature sensor
