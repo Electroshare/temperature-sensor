@@ -32,7 +32,22 @@
 #define PIN_CSN    3
 #define PIN_DEBUG  4
 
-static const char ADDRESS[6] = "00001";
+
+#ifdef DEBUG_SIMAVR
+  #include <simavr/avr/avr_mcu_section.h>
+  #include <avr/sleep.h>
+
+  AVR_MCU(1000000, "attiny13a");
+  AVR_MCU_VCD_FILE("my_trace_file.vcd", 1000);
+
+  // Debugging information for simavr
+  const struct avr_mmcu_vcd_trace_t _mytrace[]  _MMCU_ = {
+      { AVR_MCU_VCD_SYMBOL("MOSI"), .mask = (1 << PIN_MOSI), .what = (void*)&PORTB, },
+      { AVR_MCU_VCD_SYMBOL("MISO"), .mask = (1 << PIN_MISO), .what = (void*)&PORTB, },
+      { AVR_MCU_VCD_SYMBOL("SCK"), .mask = (1 << PIN_SCK), .what = (void*)&PORTB, },
+      { AVR_MCU_VCD_SYMBOL("CSN"), .mask = (1 << PIN_CSN), .what = (void*)&PORTB, },
+  };
+#endif // DEBUG_SIMAVR
 
 volatile uint16_t cnt=0;
 volatile uint8_t needSend=0;
@@ -40,7 +55,7 @@ volatile uint8_t needSend=0;
 inline void setCSN(void);
 inline void unsetCSN(void);
 void wreg(uint8_t val, uint8_t add);
-void wSPIBuff(uint8_t *buff, uint8_t size);
+void wSPIAdd(void);
 void wSPI(uint8_t val);
 
 int main(void)
@@ -48,10 +63,10 @@ int main(void)
   // Setup the clock
   cli();			//Disable global interrupts
   TCCR0B |= 1<<CS00 | 1<<CS01;	//Divide by 64
-  OCR0B = 1;			//Count 100 cycles for 1/10 second interrupt
-  TCCR0B |= 1<<WGM01;		//Put Timer/Counter1 in CTC mode
-  TIMSK0 |= 1<<OCIE0B;		//enable timer compare interrupt
-  sei();			//Enable global interrupts
+  OCR0B = 1;					//Count 100 cycles for 1/10 second interrupt
+  TCCR0B |= 1<<WGM01;		    //Put Timer/Counter1 in CTC mode
+  TIMSK0 |= 1<<OCIE0B;		    //enable timer compare interrupt
+  sei();			            //Enable global interrupts
 
   // Setup pins
   DDRB |= (1<<PIN_MOSI);	//Set PortB Pin0 as an output (MOSI)
@@ -61,6 +76,11 @@ int main(void)
 
   DDRB |= (1<<PIN_DEBUG);	//Set PortB Pin4 as an output (debug)
   
+  // Initial setup of pin values
+  unsetCSN();
+  PORTB &= ~(1<<PIN_SCK);
+  PORTB &= ~(1<<PIN_MOSI);
+
   // Wait 100ms for configuration
   while(!needSend){}
   needSend = 0;
@@ -99,16 +119,16 @@ int main(void)
   needSend = 0;
 
   // Set timer compare back to 10 -> 1s / cycle
-  OCR0B = 10;
+  //OCR0B = 10;
   // receive pipe 0 address
   setCSN();
   wSPI(W_REGISTER|NRF_RX_ADDR_P0);
-  wSPIBuff(ADDRESS, 5);
+  wSPIAdd();
   unsetCSN();
   // sending pipe address
   setCSN();
   wSPI(W_REGISTER|NRF_TX_ADDR);
-  wSPIBuff(ADDRESS, 5);
+  wSPIAdd();
   unsetCSN();
   // packet size = 32
   wreg(0x20, NRF_RX_PW_P0);
@@ -119,7 +139,11 @@ int main(void)
   needSend = 0;
   
   // Main loop
-  while(1) {
+  //while(1) {
+  for(uint8_t it=0; it<2; it++){
+	  needSend = 0;
+	  while(!needSend){}
+
     if(needSend){
       needSend = 0;
       setCSN();
@@ -132,6 +156,10 @@ int main(void)
       PORTB &= ~(1<<PIN_DEBUG);
     }
   }
+  #ifdef DEBUG_SIMAVR
+    cli();
+    sleep_mode();
+  #endif // DEBUG_SIMAVR
 }
 
 // Set the CSN pin low to begin a transmission
@@ -145,21 +173,24 @@ inline void unsetCSN(void){
 }
 
 // Write an entire buffer to the SPI
-void wSPIBuff(uint8_t *buff, uint8_t size) {
-  while(--size)
-    wSPI(*buff++);
+void wSPIAdd() {
+  wSPI('0');
+  wSPI('0');
+  wSPI('0');
+  wSPI('0');
+  wSPI('1');
 }
 
 // Write a single byte to the SPI
 void wSPI(uint8_t val) {
   for(uint8_t i=0; i<8; i++){
-    PORTB |= (1<<PIN_SCK);
+    PORTB &= ~(1<<PIN_SCK);
     if(((1<<7) & val) != 0) {
       PORTB |= (1<<PIN_MOSI);
     }else{
       PORTB &= ~(1<<PIN_MOSI);
     }
-    PORTB &= ~(1<<PIN_SCK);
+    PORTB |= (1<<PIN_SCK);
     val <<= 1;
   }
 }
@@ -176,7 +207,7 @@ void wreg(uint8_t val, uint8_t add){
 ISR(TIM0_COMPB_vect)
 {
   cnt += 1;
-  if(cnt%128 == 0){
+  if(cnt%2 == 0){
     PORTB |= (1<<PIN_DEBUG);
     needSend=1;
     //PORTB |= (1<<PIN_DEBUG);

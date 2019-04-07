@@ -91,6 +91,10 @@ $(patsubst %,-I%,$(EXTRAINCDIRS))
 #CFLAGS += -std=c99
 CFLAGS += -std=gnu99
 
+# Also include files in /usr/local/include
+# (needed for simavr include file)
+CFLAGS += -I /usr/local/include
+
 
 
 # Optional assembler flags.
@@ -170,6 +174,8 @@ DIRLIB = $(DIRAVR)/avr/lib
 SHELL = sh
 
 CC = avr-gcc
+
+SIMAVR = simavr
 
 OBJCOPY = avr-objcopy
 OBJDUMP = avr-objdump
@@ -286,6 +292,10 @@ program: $(TARGET).hex $(TARGET).eep
 	$(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_WRITE_FLASH) $(AVRDUDE_WRITE_EEPROM)
 
 
+# Simulate the program with simavr
+simulate: CFLAGS += -DDEBUG_SIMAVR
+simulate: $(TARGET).elf
+	$(SIMAVR) $(TARGET).elf
 
 
 # Create final output files (.hex, .eep) from ELF output file.
